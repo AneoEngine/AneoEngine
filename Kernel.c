@@ -253,7 +253,7 @@ void Shell()
 
 void kmain()
 {
-	Print("Kernel loaded OK\n");
+	Print("Kernel loaded  OK\n");
 	Print("\nWelcome to AneoEngine!\n");
 
 	Shell();

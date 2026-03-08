@@ -48,7 +48,7 @@ hang:
 	jmp hang
 
 
-msg db "Kernel entry OK",0
+msg db "Kernel entry   OK",0
 
 
 gdt_start:
