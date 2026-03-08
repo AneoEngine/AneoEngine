@@ -1,0 +1,8 @@
+#!/bin/bash
+nasm Boot.asm -f bin -o Boot.bin
+nasm KernelEntry.asm -f elf32 -o KernelEntry.o
+gcc -m32 -ffreestanding -fno-pie -fno-pic -nostdlib -c Kernel.c -o Kernel.o
+ld -m elf_i386 -T Link.ld KernelEntry.o Kernel.o -o Kernel.bin --oformat binary
+dd if=/dev/zero of=AneoEngine.ISO bs=512 count=2880
+dd if=Boot.bin of=AneoEngine.ISO conv=notrunc
+dd if=Kernel.bin of=AneoEngine.ISO bs=512 seek=1 conv=notrunc

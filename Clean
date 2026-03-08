@@ -1,0 +1,3 @@
+#!/bin/bash
+rm Boot.bin Kernel.bin KernelEntry.o Kernel.o AneoEngine.ISO
+
