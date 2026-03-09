@@ -6,8 +6,11 @@ volatile uint32_t timer_ticks = 0;
 int cursor_x = 0;
 int cursor_y = 5;
 int shift = 0;
-uint8_t tcolor = 0x0F;
+uint8_t TCOLOR = 0x0F;
+uint8_t DCOLOR = 0x1F;
 
+char *line1 = "=====AneoEngine V0.2 x86 Operating System========================Shell();=======";
+char *empt = "                                                                                ";
 static inline void outb(uint16_t port, uint8_t val)
 {
 	__asm__ volatile("outb %0,%1"::"a"(val),"Nd"(port));
@@ -53,10 +56,10 @@ void UpdateCursor()
 
 void Scroll()
 {
-	if(cursor_y < 50)
+	if(cursor_y < 49)
 		return;
 
-	for(int y = 1; y < 50; y++)
+	for(int y = 1; y < 49; y++)
 	{
 		for(int x = 0; x < 80; x++)
 		{
@@ -66,10 +69,10 @@ void Scroll()
 
 	for(int x = 0; x < 80; x++)
 	{
-		VGA[(49)*80 + x] = (0x0F << 8) | ' ';
+		VGA[(48)*80 + x] = (TCOLOR << 8) | ' ';
 	}
 
-	cursor_y = 49;
+	cursor_y = 48;
 }
 
 void PutChar(char c)
@@ -83,7 +86,7 @@ void PutChar(char c)
 		return;
 	}
 
-	VGA[cursor_y * 80 + cursor_x] = (tcolor << 8) | c;
+	VGA[cursor_y * 80 + cursor_x] = (TCOLOR << 8) | c;
 
 	cursor_x++;
 
@@ -103,6 +106,7 @@ void Print(const char* str)
 	for(int i = 0; str[i]; i++)
 		PutChar(str[i]);
 }
+
 
 void PrintHex(uint32_t n)
 {
@@ -130,6 +134,7 @@ void init_timer()
         outb(0x43,0x36);
         outb(0x40,divisor & 0xFF);
         outb(0x40,(divisor >> 8) & 0xFF);
+	Print("Timer loaded   OK  IOP  0x00000040,0x00000043\n");
 }
 
 
@@ -199,39 +204,156 @@ char GetChar()
 	}
 }
 
+uint8_t parse_hex(char* str)
+{
+        uint8_t val = 0;
+        for (int i = 0; i < 2; i++) {
+                char c = str[i];
+                uint8_t nibble = 0;
+
+                if (c >= '0' && c <= '9') nibble = c - '0';
+                else if (c >= 'a' && c <= 'f') nibble = c - 'a' + 10;
+                else if (c >= 'A' && c <= 'F') nibble = c - 'A' + 10;
+                else break;
+
+                val = (val << 4) | nibble;
+        }
+        return val;
+}
+
+
 void help()
 {
 	Print("AneoEngine commands:\n");
-	Print("help: display this message\n");
-	Print("info: display AneoEngine info\n");
-	Print("cls: clears the screen\n");
-	Print("entropy: print a random number\n");
-	Print("calc: simple calculator: (<X><operator><Y>)\n");
-	Print("vmoff: shut down your virtual machine\n");
-	Print("poweroff: shut down your machine\n");
-	Print("addresses: display a list of used memory addresses\n");
-	Print("banner: print an ascii banner of AneoEngine\n");
+	Print("help........display this message\n");
+	Print("info........display AneoEngine info\n");
+	Print("cls.........clears the screen\n");
+	Print("entropy.....print a random number\n");
+	Print("calc........simple calculator: (<X><operator><Y>)\n");
+	Print("vmoff.......shut down your virtual machine\n");
+	Print("poweroff....shut down your machine\n");
+	Print("addresses...display a list of used memory addresses\n");
+	Print("banner......print an ascii banner of AneoEngine\n");
+	Print("panic.......crash the system\n");
 }
 
 void info()
 {
-	Print("AneoEngine V0.2\n");
-	Print("x86 Operating System\n");
+	Print("AneoEngine V0.2 x86 Operating System\n");
 	Print("Creator/Owner: Rocco Himel\n");
 }
 
 void cls()
 {
-	Print("0x0000F20 -> 0xB8000\n");
+	uint8_t OLDCOLOR = TCOLOR;
+	Print("0x00000F20 -> 0x000B8000\n");
 	Sleep(10);
-	for(int i = 0; i < 80*50; i++)
-		VGA[i] = (0x0F << 8) | ' ';
+
+	TCOLOR = 0x0C;
+	Print("Failed to write value 0x00000F20 to 0x000B800");
+
+	TCOLOR = OLDCOLOR;
+
+	volatile unsigned short *vga_mem = (volatile unsigned short *)0xB8000;
+	unsigned short blank = (TCOLOR << 8) | ' ';
+
+	for(int i = 0; i < 80 * 50; i++)
+	{
+		vga_mem[i] = blank;
+	}
 
 	cursor_x = 0;
 	cursor_y = 0;
 
 	UpdateCursor();
 }
+
+void PrintNumber(uint32_t n)
+{
+        char buf[16];
+        int i = 0;
+
+        if(n == 0)
+        {
+                PutChar('0');
+                return;
+        }
+
+        while(n > 0)
+        {
+                buf[i++] = '0' + (n % 10);
+                n /= 10;
+        }
+
+        for(int j = i-1; j >= 0; j--)
+                PutChar(buf[j]);
+}
+
+
+void color(uint8_t hex_value)
+{
+        Print("0x000000");
+        PrintNumber(hex_value);
+        Print(" -> 0x000B8000\n");
+        TCOLOR = hex_value;
+        Print("TCOLOR set to 0x000000");
+        PrintNumber(hex_value);
+        Print("\n");
+}
+
+void addresses()
+{
+        Print(" =====ADDRESS======USAGE=======================SIZE====\n");
+        Print(" | 0x00000000      Interupt Vector Table       1024   |\n");
+        Print(" | 0x00000400      BIOS Data Arena             30720  |\n");
+        Print(" | 0x00007C00      Bootloader start            512    |\n");
+        Print(" | 0x00007DFF      Bootloader end              512    |\n");
+        Print(" | 0x00001000      Kernel start                10240  |\n");
+        Print(" | 0x00001000      Kernel entry start          10240  |\n");
+        Print(" | 0x000037FF      End of kernel               10240  |\n");
+        Print(" | 0x00090000      Stack; protected mode       716800 |\n");
+        Print(" | 0x000B8000      VGA text buffer             4000   |\n");
+        Print(" | 0x00001919      AneoEngine shell            7910   |\n");
+        Print(" | 0x00100000      Unused memory               N/A    |\n");
+        Print(" ======================================================\n");
+}
+
+
+void panic(const char* msg)
+{
+        Sleep(100);
+
+	color(0x0F);
+
+	cursor_x = 50;
+
+	while(cursor_x != 0)
+	{
+		Print(empt);
+		cursor_x--;
+		Sleep(1);
+	}
+
+	__asm__ volatile("cli");
+
+	cls();
+
+	info();
+
+	addresses();
+
+	Print("0x000000F4 -> 0x00000000\n");
+        Print("========================\n");
+        Print("System halted due to \n");
+        Print("REASON: ");
+        Print(msg);
+
+        while(1)
+        {
+                __asm__ volatile("hlt");
+        }
+}
+
 
 uint32_t rand()
 {
@@ -245,27 +367,6 @@ uint32_t rand()
 	__asm__ volatile("rdtsc":"=a"(a),"=d"(d));
 
 	return a ^ d;
-}
-
-void PrintNumber(uint32_t n)
-{
-	char buf[16];
-	int i = 0;
-
-	if(n == 0)
-	{
-		PutChar('0');
-		return;
-	}
-
-	while(n > 0)
-	{
-		buf[i++] = '0' + (n % 10);
-		n /= 10;
-	}
-
-	for(int j = i-1; j >= 0; j--)
-		PutChar(buf[j]);
 }
 
 int atoi(const char* s)
@@ -287,9 +388,9 @@ void entropy()
 	uint32_t r = rand() % 90000 + 10000;
 
 	Print("New entropy value: ");
-	tcolor = 0x02;
+	TCOLOR = 0x1A;
 	PrintNumber(r);
-	tcolor = 0x0F;
+	TCOLOR = DCOLOR;
 	Print("\n");
 }
 
@@ -338,31 +439,33 @@ void calcmsg()
 
 void vmoff()
 {
+	uint8_t OLDCOLOR = TCOLOR;
 	Print("Attempting to poweroff...\n");
 	Sleep(50);
 
 	Print("0x00002000 -> 0x00000604\n");
 	Sleep(10);
 	outw(0x604,0x2000);
-	tcolor = 0x0C;
+	TCOLOR = 0x1C;
 	Print("Failed to write value 0x00002000 to 0x00000604\n");
-	tcolor = 0x0F;
+	TCOLOR = OLDCOLOR;
 
 	Print("0x00002000 -> 0x0000B004\n");
 	Sleep(10);
 	outw(0xB004,0x2000);
-	tcolor = 0x0C;
+	TCOLOR = 0x1C;
 	Print("Failed to write value 0x00002000 to 0x0000B004\n");
-	tcolor = 0x0F;
+	TCOLOR = OLDCOLOR;
 
 	Print("0x00002000 -> 0x00004004\n");
 	Sleep(10);
 	outw(0x4004,0x2000);
-	tcolor = 0x0C;
+	TCOLOR = 0x1C;
 	Print("Failed to write value 0x00002000 to 0x00004004\n");
 	Print("ERROR: unable to shutdown virtual machine\n");
-	tcolor = 0x0F;
-
+	TCOLOR = OLDCOLOR;
+	Sleep(100);
+	panic("Unable to shutdown virtual machine\n");
 	while(1);
 }
 
@@ -390,48 +493,50 @@ void poweroff()
 		:"ax","bx","cx"
 	);
 
+		uint8_t OLDCOLOR = TCOLOR;
+		TCOLOR = 0x1C;
 		Print("Failed to execute 0x00000015 BIOS interrupt");
+		TCOLOR = OLDCOLOR;
 }
 
-void addresses()
-{
-	Print(" =====ADDRESS======USAGE=======================SIZE====\n");
-	Print(" | 0x00000000      Interupt Vector Table       1024   |\n");
-	Print(" | 0x00000400      BIOS Data Arena             30720  |\n");
-	Print(" | 0x00007C00      Bootloader start            512    |\n");
-	Print(" | 0x00007DFF      Bootloader end              512    |\n");
-	Print(" | 0x00001000      Kernel start                10240  |\n");
-	Print(" | 0x00001000      Kernel entry start          10240  |\n");
-	Print(" | 0x000037FF      End of kernel               10240  |\n");
-	Print(" | 0x00090000      Stack; protected mode       716800 |\n");
-	Print(" | 0x000B8000      VGA text buffer             4000   |\n");
-	Print(" | 0x00001919      AneoEngine shell            7910   |\n");
-	Print(" | 0x00100000      Unused memory               N/A    |\n");
-	Print(" ======================================================\n");
-}
 
 void banner()
 {
-	tcolor = 0x03;
 	Print("     ___                     ______            _            \n");
 	Print("    /   |  ____  ___  ____  / ____/___  ____ _(_)___  ___   \n");
 	Print("   / /| | / __ \\/ _ \\/ __ \\/ __/ / __ \\/ __ `/ / __ \\/ _ \\  \n");
 	Print("  / ___ |/ / / /  __/ /_/ / /___/ / / / /_/ / / / / /  __/  \n");
 	Print(" /_/  |_/_/ /_/\\___/\\____/_____/_/ /_/\\__, /_/_/ /_/\\___/   \n");
 	Print("                                     /____/                 \n");
-	tcolor = 0x0F;
 }
 
+void startup()
+{
+	help();
+	Print("\n");
+}
 void Shell()
 {
+	color(DCOLOR);
+	cls();
+	cursor_y = 0;
+	Print(line1);
 	Print("Shell loaded   OK       0x00001919\n");
 	Print("\n");
+	startup();
 	char buffer[64];
 	int pos;
 
 	while(1)
 	{
+		uint8_t oldcursor_y = cursor_y;
+		cursor_y = 0;
+		Print(line1);
+		cursor_y = oldcursor_y;
+
 		Print("> ");
+
+		TCOLOR = 0x1A;
 
 		pos = 0;
 
@@ -456,7 +561,7 @@ void Shell()
 						cursor_y--;
 					}
 
-					VGA[cursor_y * 80 + cursor_x] = (0x0F << 8) | ' ';
+					VGA[cursor_y * 80 + cursor_x] = (TCOLOR << 8) | ' ';
 					UpdateCursor();
 				}
 
@@ -472,6 +577,7 @@ void Shell()
 
 		Print("\n");
 
+		TCOLOR = DCOLOR;
 		if(pos == 0)
 			continue;
 
@@ -495,6 +601,13 @@ void Shell()
 			addresses();
 		else if(strcmp(buffer,"banner"))
 			banner();
+		else if(strcmp(buffer,"panic"))
+			panic("User input");
+		else if (buffer[0]=='c' && buffer[1]=='o' && buffer[2]=='l' && buffer[3]=='o' && buffer[4]=='r' && buffer[5]==' ')
+		{
+        		uint8_t hex_val = parse_hex(buffer + 6);
+        		color(hex_val);
+		}
 		else
 			Print("Unknown command\n");
 	}
@@ -503,10 +616,16 @@ void Shell()
 void kmain()
 {
 	Print("Kernel loaded  OK  OCU  0x00001000-0x000037FF\n");
-	Print("Foreground set to ");
-	PrintHex(tcolor);
-	Print("\n");
+	uint8_t newone = 0x0F;
+	color(newone);
 	init_timer();
-	Print("Timer loaded   OK  IOP  0x00000040,0x00000043\n");
+	Print("\n Loading shell...");
+	Sleep(150);
+
 	Shell();
+
+	TCOLOR = 0x0C;
+	Print("\nFailed to execute the shell\n");
+	Print("ERROR: unable to execute the shell\n");
+	panic("Unable to execute the shell");
 }
