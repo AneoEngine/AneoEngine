@@ -1,8 +1,18 @@
 #!/bin/bash
+
+set -e
+
+echo "[C] Compiling the bootloader..."
 nasm Boot.asm -f bin -o Boot.bin
+echo "[C] Compiling the kernel entry..."
 nasm KernelEntry.asm -f elf32 -o KernelEntry.o
+echo "[C] Compiling the kernel..."
 gcc -m32 -ffreestanding -fno-pie -fno-pic -nostdlib -c Kernel.c -o Kernel.o
+echo "[L] Linking the kernel..."
 ld -m elf_i386 -T Link.ld KernelEntry.o Kernel.o -o Kernel.bin --oformat binary
+echo "[+] Initializing the ISO..."
 dd if=/dev/zero of=AneoEngine.ISO bs=512 count=2880
+echo "[+] Adding the bootloader to the ISO..."
 dd if=Boot.bin of=AneoEngine.ISO conv=notrunc
+echo "[+] Adding the kernel to the ISO..."
 dd if=Kernel.bin of=AneoEngine.ISO bs=512 seek=1 conv=notrunc

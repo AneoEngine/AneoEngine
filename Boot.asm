@@ -82,8 +82,8 @@ NewLine:
 	ret
 
 
-bootmsg	db	"Bootloader     OK",0
-kernmsg	db	"Kernel sectors OK",0
+bootmsg	db	"Bootloader     OK  OCU  0x00007C00-0x00007CFF",0
+kernmsg	db	"Kernel sectors DETECTED",0
 
 BOOT_DRIVE	db	0
 
