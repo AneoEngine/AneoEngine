@@ -4,7 +4,7 @@ volatile uint16_t* VGA = (uint16_t*)0xB8000;
 volatile uint32_t timer_ticks = 0;
 
 int cursor_x = 0;
-int cursor_y = 3;
+int cursor_y = 5;
 int shift = 0;
 uint8_t tcolor = 0x0F;
 
@@ -30,15 +30,6 @@ void timer_handler()
 	timer_ticks++;
 }
 
-void init_timer()
-{
-	uint32_t freq = 1000;
-	uint32_t divisor = 1193180 / freq;
-
-	outb(0x43,0x36);
-	outb(0x40,divisor & 0xFF);
-	outb(0x40,(divisor >> 8) & 0xFF);
-}
 
 void Sleep(uint32_t t)
 {
@@ -59,12 +50,13 @@ void UpdateCursor()
 	outb(0x3D5,(uint8_t)((pos >> 8) & 0xFF));
 }
 
+
 void Scroll()
 {
-	if(cursor_y < 25)
+	if(cursor_y < 50)
 		return;
 
-	for(int y = 1; y < 25; y++)
+	for(int y = 1; y < 50; y++)
 	{
 		for(int x = 0; x < 80; x++)
 		{
@@ -74,10 +66,10 @@ void Scroll()
 
 	for(int x = 0; x < 80; x++)
 	{
-		VGA[(24)*80 + x] = (0x0F << 8) | ' ';
+		VGA[(49)*80 + x] = (0x0F << 8) | ' ';
 	}
 
-	cursor_y = 24;
+	cursor_y = 49;
 }
 
 void PutChar(char c)
@@ -111,6 +103,35 @@ void Print(const char* str)
 	for(int i = 0; str[i]; i++)
 		PutChar(str[i]);
 }
+
+void PrintHex(uint32_t n)
+{
+        char hex[] = "0123456789ABCDEF";
+
+        Print("0x");
+
+        for(int i = 28; i >= 0; i -= 4)
+        {
+                uint8_t digit = (n >> i) & 0xF;
+                PutChar(hex[digit]);
+        }
+}
+
+
+void init_timer()
+{
+        Print("0x00000036 -> 0x00000043\n");
+        Print("0x000000A9 -> 0x00000040\n");
+        Print("0x00000004 -> 0x00000040\n");
+
+        uint32_t freq = 1000;
+        uint32_t divisor = 1193180 / freq;
+
+        outb(0x43,0x36);
+        outb(0x40,divisor & 0xFF);
+        outb(0x40,(divisor >> 8) & 0xFF);
+}
+
 
 int strcmp(const char* a,const char* b)
 {
@@ -201,7 +222,9 @@ void info()
 
 void cls()
 {
-	for(int i = 0; i < 80*25; i++)
+	Print("0x0000F20 -> 0xB8000\n");
+	Sleep(10);
+	for(int i = 0; i < 80*50; i++)
 		VGA[i] = (0x0F << 8) | ' ';
 
 	cursor_x = 0;
@@ -212,6 +235,11 @@ void cls()
 
 uint32_t rand()
 {
+	Print("0x00000012A4F3918C -> 0xA4F3918C\n");
+	Print("0x00000012A4F3918C -> 0x00000012\n");
+	Print("0xA4F3918C -> 0xA4F3918C\n");
+	Print("0x00000012 -> 0x00000012\n");
+	Print("0xA4F3918C ^ 0x00000012 -> 0xA4F3919E\n");
 	uint32_t a,d;
 
 	__asm__ volatile("rdtsc":"=a"(a),"=d"(d));
@@ -312,13 +340,28 @@ void vmoff()
 {
 	Print("Attempting to poweroff...\n");
 	Sleep(50);
+
+	Print("0x00002000 -> 0x00000604\n");
+	Sleep(10);
 	outw(0x604,0x2000);
+	tcolor = 0x0C;
 	Print("Failed to write value 0x00002000 to 0x00000604\n");
+	tcolor = 0x0F;
+
+	Print("0x00002000 -> 0x0000B004\n");
+	Sleep(10);
 	outw(0xB004,0x2000);
+	tcolor = 0x0C;
 	Print("Failed to write value 0x00002000 to 0x0000B004\n");
+	tcolor = 0x0F;
+
+	Print("0x00002000 -> 0x00004004\n");
+	Sleep(10);
 	outw(0x4004,0x2000);
+	tcolor = 0x0C;
 	Print("Failed to write value 0x00002000 to 0x00004004\n");
 	Print("ERROR: unable to shutdown virtual machine\n");
+	tcolor = 0x0F;
 
 	while(1);
 }
@@ -352,17 +395,19 @@ void poweroff()
 
 void addresses()
 {
-	Print("0x00000000   Interupt Vector Table\n");
-	Print("0x00000400   BIOS Data Arena\n");
-	Print("0x00007C00   Bootloader start\n");
-	Print("0x00007DFF   Bootloader end\n");
-	Print("0x00001000   Kernel start\n");
-	Print("0x00001000   Kernel entry start lable\n");
-	Print("0x000037FF   End of kernel\n");
-	Print("0x00090000   Stack; protected mode\n");
-	Print("0x000B8000   VGA text buffer\n");
-	Print("0x00001919   AneoEngine shell\n");
-	Print("0x00100000+  Unused memory\n");
+	Print(" =====ADDRESS======USAGE=======================SIZE====\n");
+	Print(" | 0x00000000      Interupt Vector Table       1024   |\n");
+	Print(" | 0x00000400      BIOS Data Arena             30720  |\n");
+	Print(" | 0x00007C00      Bootloader start            512    |\n");
+	Print(" | 0x00007DFF      Bootloader end              512    |\n");
+	Print(" | 0x00001000      Kernel start                10240  |\n");
+	Print(" | 0x00001000      Kernel entry start          10240  |\n");
+	Print(" | 0x000037FF      End of kernel               10240  |\n");
+	Print(" | 0x00090000      Stack; protected mode       716800 |\n");
+	Print(" | 0x000B8000      VGA text buffer             4000   |\n");
+	Print(" | 0x00001919      AneoEngine shell            7910   |\n");
+	Print(" | 0x00100000      Unused memory               N/A    |\n");
+	Print(" ======================================================\n");
 }
 
 void banner()
@@ -380,8 +425,7 @@ void banner()
 void Shell()
 {
 	Print("Shell loaded   OK       0x00001919\n");
-        Print("\nAneoEngine V0.2 x86\n");
-
+	Print("\n");
 	char buffer[64];
 	int pos;
 
@@ -459,6 +503,9 @@ void Shell()
 void kmain()
 {
 	Print("Kernel loaded  OK  OCU  0x00001000-0x000037FF\n");
+	Print("Foreground set to ");
+	PrintHex(tcolor);
+	Print("\n");
 	init_timer();
 	Print("Timer loaded   OK  IOP  0x00000040,0x00000043\n");
 	Shell();
