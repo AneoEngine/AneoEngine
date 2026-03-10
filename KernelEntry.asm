@@ -1,7 +1,11 @@
-bits 16
-global start
+bits	16
+global	start
 
 start:
+
+	mov	ax,cs
+	mov	ds,ax
+	mov	es,ax
 
 	mov	ah,0x02
 	mov	bh,0
@@ -12,6 +16,7 @@ start:
 	mov	si,msg
 
 .print:
+
 	lodsb
 	cmp	al,0
 	je	.continue
@@ -44,7 +49,8 @@ start:
 	jmp	0x08:protected_mode
 
 
-bits 32
+bits	32
+
 protected_mode:
 
 	mov	ax,0x10
@@ -53,6 +59,7 @@ protected_mode:
 	mov	fs,ax
 	mov	gs,ax
 	mov	ss,ax
+
 	mov	esp,0x90000
 
 	extern	kmain
@@ -66,11 +73,15 @@ msg	db	"Kernel entry   OK       0x00001000",0
 
 
 gdt_start:
-dq	0
-dq	0x00CF9A000000FFFF
-dq	0x00CF92000000FFFF
+
+	dq	0
+	dq	0x00CF9A000000FFFF
+	dq	0x00CF92000000FFFF
+
 gdt_end:
 
+
 gdt_descriptor:
-dw	gdt_end - gdt_start - 1
-dd	gdt_start
+
+	dw	gdt_end - gdt_start - 1
+	dd	gdt_start

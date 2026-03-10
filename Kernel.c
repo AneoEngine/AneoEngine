@@ -9,6 +9,24 @@ int shift = 0;
 uint8_t TCOLOR = 0x0F;
 uint8_t DCOLOR = 0x1F;
 
+#define MAX_FILES 16
+#define MAX_NAME 32
+#define MAX_DATA 512
+
+typedef struct
+{
+	char name[MAX_NAME];
+	char data[MAX_DATA];
+	int size;
+	int used;
+	int is_dir;
+	int parent;
+} File;
+
+File fs[MAX_FILES];
+
+int cwd = 0;
+
 char *line1 = "=====AneoEngine V0.2 x86 Operating System========================Shell();=======";
 char *empt = "                                                                                ";
 static inline void outb(uint16_t port, uint8_t val)
@@ -221,6 +239,152 @@ uint8_t parse_hex(char* str)
         return val;
 }
 
+void fs_init()
+{
+	fs[0].used = 1;
+	fs[0].is_dir = 1;
+	fs[0].parent = 0;
+	fs[0].name[0] = '/';
+	fs[0].name[1] = 0;
+}
+
+int fs_find(char *name)
+{
+	for(int i=0;i<MAX_FILES;i++)
+	{
+		if(fs[i].used && fs[i].parent == cwd && strcmp(fs[i].name,name))
+			return i;
+	}
+	return -1;
+}
+
+void fs_touch(char *name)
+{
+	for(int i=0;i<MAX_FILES;i++)
+	{
+		if(!fs[i].used)
+		{
+			fs[i].used = 1;
+			fs[i].is_dir = 0;
+			fs[i].parent = cwd;
+
+			int j=0;
+			while(name[j])
+			{
+				fs[i].name[j] = name[j];
+				j++;
+			}
+			fs[i].name[j] = 0;
+
+			fs[i].size = 0;
+			return;
+		}
+	}
+
+	Print("FS full\n");
+}
+
+void fs_mkdir(char *name)
+{
+	for(int i=0;i<MAX_FILES;i++)
+	{
+		if(!fs[i].used)
+		{
+			fs[i].used = 1;
+			fs[i].is_dir = 1;
+			fs[i].parent = cwd;
+
+			int j=0;
+			while(name[j])
+			{
+				fs[i].name[j] = name[j];
+				j++;
+			}
+
+			fs[i].name[j]=0;
+			return;
+		}
+	}
+}
+
+void fs_ls()
+{
+	for(int i=0;i<MAX_FILES;i++)
+	{
+		if(fs[i].used && fs[i].parent == cwd && i != cwd)
+		{
+			if(fs[i].is_dir)
+				Print("[DIR] ");
+			else
+				Print("[FILE] ");
+
+			Print(fs[i].name);
+			Print("\n");
+		}
+	}
+}
+
+void fs_cat(char *name)
+{
+	int id = fs_find(name);
+
+	if(id < 0)
+	{
+		Print("File not found\n");
+		return;
+	}
+
+	Print(fs[id].data);
+	Print("\n");
+}
+
+void fs_echo(char *text, char *file)
+{
+	int id = fs_find(file);
+
+	if(id < 0)
+	{
+		Print("File not found\n");
+		return;
+	}
+
+	int i=0;
+
+	while(text[i] && i < MAX_DATA-1)
+	{
+		fs[id].data[i] = text[i];
+		i++;
+	}
+
+	fs[id].data[i]=0;
+	fs[id].size = i;
+}
+
+void fs_cd(char *name)
+{
+	int id = fs_find(name);
+
+	if(id < 0 || !fs[id].is_dir)
+	{
+		Print("Directory not found\n");
+		return;
+	}
+
+	cwd = id;
+}
+
+void fs_rm(char *name)
+{
+	int id = fs_find(name);
+
+	if(id < 0)
+	{
+		Print("File not found\n");
+		return;
+	}
+
+	fs[id].used = 0;
+}
 
 void help()
 {
@@ -608,6 +772,23 @@ void Shell()
         		uint8_t hex_val = parse_hex(buffer + 6);
         		color(hex_val);
 		}
+		else if(strcmp(buffer,"ls"))
+			fs_ls();
+
+		else if(buffer[0]=='t' && buffer[1]=='o' && buffer[2]=='u' && buffer[3]=='c' && buffer[4]=='h' && buffer[5]==' ')
+			fs_touch(buffer+6);
+
+		else if(buffer[0]=='m' && buffer[1]=='k' && buffer[2]=='d' && buffer[3]=='i' && buffer[4]=='r' && buffer[5]==' ')
+			fs_mkdir(buffer+6);
+
+		else if(buffer[0]=='c' && buffer[1]=='a' && buffer[2]=='t' && buffer[3]==' ')
+			fs_cat(buffer+4);
+
+		else if(buffer[0]=='c' && buffer[1]=='d' && buffer[2]==' ')
+			fs_cd(buffer+3);
+
+		else if(buffer[0]=='r' && buffer[1]=='m' && buffer[2]==' ')
+			fs_rm(buffer+3);
 		else
 			Print("Unknown command\n");
 	}
@@ -619,6 +800,7 @@ void kmain()
 	uint8_t newone = 0x0F;
 	color(newone);
 	init_timer();
+	fs_init();
 	Print("\n Loading shell...");
 	Sleep(150);
 

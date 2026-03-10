@@ -2,7 +2,7 @@
 bits	16
 
 KERNEL_OFFSET	equ	0x1000
-KERNEL_SECTORS	equ	20
+KERNEL_SECTORS	equ	32
 
 start:
 
@@ -32,7 +32,7 @@ start:
 	call	Print
 	call	NewLine
 
-	mov	ah,0x00
+	mov	ah,0
 	mov	dl,[BOOT_DRIVE]
 	int	0x13
 
@@ -40,33 +40,19 @@ start:
 	call	Print
 	call	NewLine
 
+
+	mov	ax,0
+	mov	es,ax
 	mov	bx,KERNEL_OFFSET
-	mov	si,KERNEL_SECTORS
-	mov	cl,2
-
-load_loop:
-
-	push	cx
-	push	si
-
-retry:
 
 	mov	ah,0x02
-	mov	al,1
+	mov	al,KERNEL_SECTORS
 	mov	ch,0
+	mov	cl,2
 	mov	dh,0
 	mov	dl,[BOOT_DRIVE]
-
 	int	0x13
-	jc	retry
-
-	pop	si
-	pop	cx
-
-	add	bx,512
-	inc	cl
-	dec	si
-	jnz	load_loop
+	jc	$
 
 	jmp	0x0000:KERNEL_OFFSET
 
@@ -86,6 +72,7 @@ Print:
 	int	0x10
 
 	jmp	Print
+
 .done:
 	ret
 
