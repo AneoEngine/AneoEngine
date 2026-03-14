@@ -6,8 +6,13 @@ volatile uint32_t timer_ticks = 0;
 int cursor_x = 0;
 int cursor_y = 5;
 int shift = 0;
+
 uint8_t TCOLOR = 0x0F;
-uint8_t DCOLOR = 0x1F;
+uint8_t BCOLOR = 0x1F;
+uint8_t BLACK = 0x0F;
+uint8_t ICOLOR = 0x1A;
+uint8_t RED = 0x1C;
+uint8_t BRED = 0x0C;
 
 #define MAX_FILES 16
 #define MAX_NAME 32
@@ -409,14 +414,14 @@ void info()
 
 void cls()
 {
-	uint8_t OLDCOLOR = TCOLOR;
 	Print("0x00000F20 -> 0x000B8000\n");
 	Sleep(10);
 
-	TCOLOR = 0x0C;
+	uint8_t OCOLOR = TCOLOR;
+	TCOLOR = RED;
 	Print("Failed to write value 0x00000F20 to 0x000B800");
 
-	TCOLOR = OLDCOLOR;
+	TCOLOR = OCOLOR;
 
 	volatile unsigned short *vga_mem = (volatile unsigned short *)0xB8000;
 	unsigned short blank = (TCOLOR << 8) | ' ';
@@ -453,18 +458,6 @@ void PrintNumber(uint32_t n)
                 PutChar(buf[j]);
 }
 
-
-void color(uint8_t hex_value)
-{
-        Print("0x000000");
-        PrintNumber(hex_value);
-        Print(" -> 0x000B8000\n");
-        TCOLOR = hex_value;
-        Print("TCOLOR set to 0x000000");
-        PrintNumber(hex_value);
-        Print("\n");
-}
-
 void addresses()
 {
         Print(" =====ADDRESS======USAGE=======================SIZE====\n");
@@ -487,7 +480,7 @@ void panic(const char* msg)
 {
         Sleep(100);
 
-	color(0x0F);
+	TCOLOR = BLACK;
 
 	cursor_x = 50;
 
@@ -552,9 +545,9 @@ void entropy()
 	uint32_t r = rand() % 90000 + 10000;
 
 	Print("New entropy value: ");
-	TCOLOR = 0x1A;
+	TCOLOR = ICOLOR;
 	PrintNumber(r);
-	TCOLOR = DCOLOR;
+	TCOLOR = BCOLOR;
 	Print("\n");
 }
 
@@ -603,31 +596,30 @@ void calcmsg()
 
 void vmoff()
 {
-	uint8_t OLDCOLOR = TCOLOR;
 	Print("Attempting to poweroff...\n");
 	Sleep(50);
 
 	Print("0x00002000 -> 0x00000604\n");
 	Sleep(10);
 	outw(0x604,0x2000);
-	TCOLOR = 0x1C;
+	TCOLOR = RED;
 	Print("Failed to write value 0x00002000 to 0x00000604\n");
-	TCOLOR = OLDCOLOR;
+	TCOLOR = BCOLOR;
 
 	Print("0x00002000 -> 0x0000B004\n");
 	Sleep(10);
 	outw(0xB004,0x2000);
-	TCOLOR = 0x1C;
+	TCOLOR = RED;
 	Print("Failed to write value 0x00002000 to 0x0000B004\n");
-	TCOLOR = OLDCOLOR;
+	TCOLOR = BCOLOR;
 
 	Print("0x00002000 -> 0x00004004\n");
 	Sleep(10);
 	outw(0x4004,0x2000);
-	TCOLOR = 0x1C;
+	TCOLOR = RED;
 	Print("Failed to write value 0x00002000 to 0x00004004\n");
 	Print("ERROR: unable to shutdown virtual machine\n");
-	TCOLOR = OLDCOLOR;
+	TCOLOR = BCOLOR;
 	Sleep(100);
 	panic("Unable to shutdown virtual machine\n");
 	while(1);
@@ -657,10 +649,9 @@ void poweroff()
 		:"ax","bx","cx"
 	);
 
-		uint8_t OLDCOLOR = TCOLOR;
-		TCOLOR = 0x1C;
+		TCOLOR = RED;
 		Print("Failed to execute 0x00000015 BIOS interrupt");
-		TCOLOR = OLDCOLOR;
+		TCOLOR = BCOLOR;
 }
 
 
@@ -681,7 +672,7 @@ void startup()
 }
 void Shell()
 {
-	color(DCOLOR);
+	TCOLOR = BCOLOR;
 	cls();
 	cursor_y = 0;
 	Print(line1);
@@ -700,7 +691,7 @@ void Shell()
 
 		Print("> ");
 
-		TCOLOR = 0x1A;
+		TCOLOR = ICOLOR;
 
 		pos = 0;
 
@@ -741,7 +732,7 @@ void Shell()
 
 		Print("\n");
 
-		TCOLOR = DCOLOR;
+		TCOLOR = BCOLOR;
 		if(pos == 0)
 			continue;
 
@@ -767,11 +758,6 @@ void Shell()
 			banner();
 		else if(strcmp(buffer,"panic"))
 			panic("User input");
-		else if (buffer[0]=='c' && buffer[1]=='o' && buffer[2]=='l' && buffer[3]=='o' && buffer[4]=='r' && buffer[5]==' ')
-		{
-        		uint8_t hex_val = parse_hex(buffer + 6);
-        		color(hex_val);
-		}
 		else if(strcmp(buffer,"ls"))
 			fs_ls();
 
@@ -790,15 +776,15 @@ void Shell()
 		else if(buffer[0]=='r' && buffer[1]=='m' && buffer[2]==' ')
 			fs_rm(buffer+3);
 		else
-			Print("Unknown command\n");
+			TCOLOR = RED;
+			Print("ERROR: Unknown command\n");
+			TCOLOR = BCOLOR;
 	}
 }
 
 void kmain()
 {
 	Print("Kernel loaded  OK  OCU  0x00001000-0x000037FF\n");
-	uint8_t newone = 0x0F;
-	color(newone);
 	init_timer();
 	fs_init();
 	Print("\n Loading shell...");
@@ -806,7 +792,7 @@ void kmain()
 
 	Shell();
 
-	TCOLOR = 0x0C;
+	TCOLOR = BRED;
 	Print("\nFailed to execute the shell\n");
 	Print("ERROR: unable to execute the shell\n");
 	panic("Unable to execute the shell");
