@@ -86,7 +86,7 @@ NewLine:
 	ret
 
 
-title		db	"AneoEngine V0.2",0
+title		db	"AneoEngine V0.3",0
 bootmsg		db	"Bootloader     OK  OCU  0x00007C00-0x00007CFF",0
 kernmsg		db	"Kernel sectors DETECTED",0
 
